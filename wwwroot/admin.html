@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QrApp – Admin</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --ok:#16a34a; --warn:#f59e0b; --err:#ef4444; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:#e5e7eb; }
+    header { padding:16px 20px; border-bottom:1px solid #1f2937; display:flex; gap:12px; align-items:center; }
+    header h1 { margin:0; font-size:18px; }
+    .wrap { max-width:1100px; margin:20px auto; padding:0 16px; }
+    .card { background:var(--card); border:1px solid #1f2937; border-radius:14px; padding:16px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:12px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    label { font-size:12px; color:var(--muted); }
+    input, select { background:#0b1220; color:#e5e7eb; border:1px solid #263040; border-radius:10px; padding:10px 12px; width:100%; }
+    input[type="checkbox"]{ width:auto; transform: translateY(2px); }
+    button { border:0; padding:10px 14px; border-radius:10px; background:#334155; color:#e5e7eb; cursor:pointer; }
+    button.primary { background:#2563eb; }
+    button.warn { background:var(--warn); color:#1b1b1b; }
+    button.danger { background:#ef4444; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom:1px solid #1f2937; padding:10px; text-align:left; vertical-align:top; }
+    .muted { color:var(--muted); }
+    .pill { padding:2px 8px; border-radius:999px; font-size:12px; }
+    .ok { background:#052e1a; color:#86efac; }
+    .off{ background:#3b1a1a; color:#fecaca; }
+    .right { text-align:right; }
+    .img { max-height:88px; border:1px solid #263040; border-radius:8px; }
+    footer { color:var(--muted); font-size:12px; margin-top:10px; }
+    .split { display:grid; grid-template-columns: 1.1fr .9fr; gap:16px; }
+    @media (max-width: 900px){ .split{ grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>QrApp – Admin</h1>
+    <div class="row">
+      <label>API Key</label>
+      <input id="apiKey" placeholder="X-API-KEY" style="min-width:260px" />
+      <button onclick="saveKey()">Kaydet</button>
+    </div>
+    <div class="row">
+      <button onclick="loadPage(1)">Yenile</button>
+    </div>
+  </header>
+
+  <div class="wrap split">
+    <!-- CREATE -->
+    <section class="card">
+      <h3 style="margin:6px 0 12px">Yeni QR Oluştur</h3>
+      <div class="grid">
+        <div style="grid-column: span 6">
+          <label>Ad (Name)</label>
+          <input id="c_name" placeholder="Örn: Eylül Kampanyası" />
+        </div>
+        <div style="grid-column: span 6">
+          <label>ShortCode (boş bırakılırsa otomatik)</label>
+          <input id="c_code" placeholder="örn: kampanya2025" />
+        </div>
+        <div style="grid-column: span 12">
+          <label>Target URL</label>
+          <input id="c_url" placeholder="https://example.com/..." />
+        </div>
+        <div style="grid-column: span 6" class="row">
+          <label><input type="checkbox" id="c_oneYear" checked /> 1 yıl geçerli</label>
+        </div>
+        <div style="grid-column: span 6" class="row">
+          <label><input type="checkbox" id="c_active" checked /> Aktif</label>
+        </div>
+        <div style="grid-column: span 12" class="row">
+          <button class="primary" onclick="createQr()">Oluştur</button>
+          <span id="c_msg" class="muted"></span>
+        </div>
+      </div>
+      <footer>Not: Sınırsız isterseniz “1 yıl geçerli” kutusunu kapatın.</footer>
+    </section>
+
+    <!-- PREVIEW -->
+    <section class="card">
+      <h3 style="margin:6px 0 12px">Önizleme</h3>
+      <div id="preview" class="muted">Henüz seçim yok.</div>
+    </section>
+  </div>
+
+  <!-- LIST -->
+  <div class="wrap" style="margin-top:16px">
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:6px 0 12px">Kayıtlar</h3>
+        <div class="row">
+          <label>Sayfa</label>
+          <input id="page" type="number" value="1" min="1" style="width:90px" />
+          <button onclick="loadPage(parseInt(document.getElementById('page').value)||1)">Getir</button>
+        </div>
+      </div>
+      <div id="list"></div>
+    </section>
+  </div>
+
+  <script>
+    const base = window.location.origin;
+    const LS_KEY = "qrapp_apikey";
+
+    function getHeaders(){
+      const k = localStorage.getItem(LS_KEY) || "";
+      return { "Content-Type":"application/json", "X-API-KEY": k };
+    }
+    function saveKey(){
+      const v = document.getElementById('apiKey').value.trim();
+      localStorage.setItem(LS_KEY, v);
+      toast("API key kaydedildi.");
+      loadPage(1);
+    }
+    function toast(msg, elId="c_msg"){
+      const el = document.getElementById(elId);
+      if(!el) return;
+      el.textContent = msg;
+      setTimeout(()=> el.textContent="", 4000);
+    }
+    function fmtDate(s){
+      if(!s) return "—";
+      const d = new Date(s.endsWith('Z')? s : s+"Z");
+      return d.toLocaleString();
+    }
+    function img(src){ return `<img class="img" src="${src}" alt="qr" />`; }
+    function link(href, text){ return `<a href="${href}" target="_blank" rel="noopener">${text}</a>`; }
+
+    async function createQr(){
+      const body = {
+        name: document.getElementById('c_name').value || null,
+        shortCode: document.getElementById('c_code').value || null,
+        targetUrl: document.getElementById('c_url').value.trim(),
+        oneYear: document.getElementById('c_oneYear').checked,
+        active: document.getElementById('c_active').checked
+      };
+      if(!/^https?:\/\//i.test(body.targetUrl)){ toast("Target URL http/https olmalı"); return; }
+
+      const res = await fetch(`${base}/admin/qrcodes`, { method:"POST", headers:getHeaders(), body: JSON.stringify(body) });
+      if(!res.ok){ toast(`Hata: ${res.status} ${await res.text()}`); return; }
+      const item = await res.json();
+      toast("QR oluşturuldu.");
+      document.getElementById('preview').innerHTML = `
+        <div class="row">
+          <div>${img(`${base}/q/${item.shortCode}/png`)}</div>
+          <div>
+            <div><b>${item.name}</b></div>
+            <div class="muted">ShortCode: ${item.shortCode}</div>
+            <div>Yönlendirme: ${link(`${base}/q/${item.shortCode}`, `${base}/q/${item.shortCode}`)}</div>
+            <div>ExpireAt: <span class="muted">${item.expireAt ? fmtDate(item.expireAt) : "Sınırsız"}</span></div>
+          </div>
+        </div>`;
+      loadPage(1);
+    }
+
+    async function loadPage(p=1){
+      document.getElementById('apiKey').value = localStorage.getItem(LS_KEY) || "";
+      const res = await fetch(`${base}/admin/qrcodes?page=${p}&pageSize=20`, { headers:getHeaders() });
+      const wrap = document.getElementById('list');
+      if(res.status === 401){ wrap.innerHTML = `<div class="muted">401 – API key giriniz.</div>`; return; }
+      if(!res.ok){ wrap.innerHTML = `<div class="muted">Hata: ${res.status} ${await res.text()}</div>`; return; }
+      const data = await res.json();
+      document.getElementById('page').value = data.page;
+      if(!data.items.length){ wrap.innerHTML = `<div class="muted">Kayıt yok.</div>`; return; }
+
+      const rows = data.items.map(x => {
+        const status = x.active ? `<span class="pill ok">Aktif</span>` : `<span class="pill off">Pasif</span>`;
+        return `
+          <tr>
+            <td style="width:110px">${img(`${base}/q/${x.shortCode}/png`)}</td>
+            <td>
+              <div><b>${x.name}</b> ${status}</div>
+              <div class="muted">#${x.id} • ShortCode: <b>${x.shortCode}</b> • Scan: ${x.scanCount}</div>
+              <div>Target: ${link(x.targetUrl, x.targetUrl)}</div>
+              <div>ExpireAt: <span class="muted">${x.expireAt ? fmtDate(x.expireAt) : "Sınırsız"}</span> • Created: ${fmtDate(x.createdAt)}</div>
+
+              <div class="row" style="margin-top:8px">
+                <input id="t_${x.id}" placeholder="Yeni Target URL..." style="min-width:300px" />
+                <button onclick="upd(${x.id})">Güncelle</button>
+                <button class="warn" onclick="toYear(${x.id})">1 Yıl Yap</button>
+                <button onclick="toUnlimited(${x.id})">Sınırsız Yap</button>
+                <button onclick="rot(${x.id})">Kodu Yenile</button>
+                <button class="danger" onclick="del(${x.id})">Sil</button>
+              </div>
+              <div class="muted">Yönlendirme: ${link(`${base}/q/${x.shortCode}`, `${base}/q/${x.shortCode}`)}</div>
+            </td>
+          </tr>`;
+      }).join("");
+
+      wrap.innerHTML = `
+        <table>
+          <thead><tr><th>QR</th><th>Bilgi</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="row" style="justify-content:space-between;margin-top:10px">
+          <div class="muted">Toplam: ${data.total}</div>
+          <div>
+            <button onclick="loadPage(${data.page-1})" ${data.page<=1?'disabled':''}>Önceki</button>
+            <button onclick="loadPage(${data.page+1})">Sonraki</button>
+          </div>
+        </div>`;
+    }
+
+    async function upd(id){
+      const t = document.getElementById(`t_${id}`).value.trim();
+      const body = {};
+      if(t){ if(!/^https?:\/\//i.test(t)) { alert("URL http/https olmalı"); return; } body.targetUrl = t; }
+      const res = await fetch(`${base}/admin/qrcodes/${id}`, { method:"PUT", headers:getHeaders(), body: JSON.stringify(body) });
+      if(!res.ok){ alert(`Hata: ${res.status}`); return; }
+      loadPage(parseInt(document.getElementById('page').value)||1);
+    }
+    async function toYear(id){
+      const res = await fetch(`${base}/admin/qrcodes/${id}`, { method:"PUT", headers:getHeaders(), body: JSON.stringify({ oneYear:true, resetOneYear:true }) });
+      if(!res.ok){ alert(`Hata: ${res.status}`); return; }
+      loadPage(parseInt(document.getElementById('page').value)||1);
+    }
+    async function toUnlimited(id){
+      const res = await fetch(`${base}/admin/qrcodes/${id}`, { method:"PUT", headers:getHeaders(), body: JSON.stringify({ oneYear:false }) });
+      if(!res.ok){ alert(`Hata: ${res.status}`); return; }
+      loadPage(parseInt(document.getElementById('page').value)||1);
+    }
+    async function rot(id){
+      const res = await fetch(`${base}/admin/qrcodes/${id}/rotate-code`, { method:"POST", headers:getHeaders() });
+      if(!res.ok){ alert(`Hata: ${res.status}`); return; }
+      loadPage(parseInt(document.getElementById('page').value)||1);
+    }
+    async function del(id){
+      if(!confirm("Silinsin mi?")) return;
+      const res = await fetch(`${base}/admin/qrcodes/${id}`, { method:"DELETE", headers:getHeaders() });
+      if(res.status===204){ loadPage(parseInt(document.getElementById('page').value)||1); return; }
+      alert(`Hata: ${res.status}`);
+    }
+
+    // init
+    document.getElementById('apiKey').value = localStorage.getItem(LS_KEY) || "";
+    loadPage(1);
+  </script>
+</body>
+</html>

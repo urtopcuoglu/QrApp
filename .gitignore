@@ -1,0 +1,16 @@
+# .NET build çıktıları
+bin/
+obj/
+# Rider/VS
+.idea/
+.vs/
+*.user
+*.suo
+# Yerel DB/çöpler
+*.db
+*.sqlite
+*.mdf
+*.ldf
+# Secret'ları commit etme (geliştirme)
+appsettings.Development.json
+# (EF Migrations'ı commit ET: Migrations/ klasörünü SİLME!)
