@@ -72,8 +72,7 @@ app.MapGet("/q/{shortCode}/png", async ([FromRoute] string shortCode, AppDbConte
     var entry = await db.QRCodes.AsNoTracking().FirstOrDefaultAsync(x => x.ShortCode == shortCode);
     if (entry is null) return Results.NotFound();
 
-    var origin = $"{http.Request.Scheme}://{http.Request.Host.Value}";
-    var content = $"{origin}/q/{entry.ShortCode}";
+    var content = entry.TargetUrl; // <-- değişiklik
 
     using var gen = new QRCodeGenerator();
     using var data = gen.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
@@ -82,6 +81,7 @@ app.MapGet("/q/{shortCode}/png", async ([FromRoute] string shortCode, AppDbConte
 
     return Results.File(png, "image/png");
 });
+
 
 // --- Admin ---
 app.MapPost("/admin/qrcodes", async ([FromBody] CreateQrDto dto, AppDbContext db) =>

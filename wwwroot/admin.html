@@ -148,7 +148,7 @@
           <div>
             <div><b>${item.name}</b></div>
             <div class="muted">ShortCode: ${item.shortCode}</div>
-            <div>Yönlendirme: ${link(`${base}/q/${item.shortCode}`, `${base}/q/${item.shortCode}`)}</div>
+            <div>Yönlendirme: ${link(item.targetUrl, item.targetUrl)}</div>
             <div>ExpireAt: <span class="muted">${item.expireAt ? fmtDate(item.expireAt) : "Sınırsız"}</span></div>
           </div>
         </div>`;
@@ -184,7 +184,8 @@
                 <button onclick="rot(${x.id})">Kodu Yenile</button>
                 <button class="danger" onclick="del(${x.id})">Sil</button>
               </div>
-              <div class="muted">Yönlendirme: ${link(`${base}/q/${x.shortCode}`, `${base}/q/${x.shortCode}`)}</div>
+              <div class="muted">Yönlendirme: ${link(x.targetUrl, x.targetUrl)}</div>
+
             </td>
           </tr>`;
       }).join("");
